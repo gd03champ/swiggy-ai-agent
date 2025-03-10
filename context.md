@@ -1,0 +1,6 @@
+- add products to cart from chat
+- image upload workflow (hallucinates for now)
+- refund workflow system prompt - better orderId api
+- better products (more products) and restaurant search api
+- checkout fix
+- user preferences add and retrieve | prescription workflow

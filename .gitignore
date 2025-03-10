@@ -1,0 +1,48 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+
+# Editor directories and files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Media and large files
+*.mp4
+*.mov
+*.avi
+*.wmv
+
+# Build outputs
+build/
+dist/
+out/
+
+# Dependency directories (already covered in subdirectory .gitignore files)
+node_modules/
+__pycache__/
+venv/
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Backend specific ignores are in backend/.gitignore
+# Frontend specific ignores are in frontend/.gitignore

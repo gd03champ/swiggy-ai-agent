@@ -1,0 +1,99 @@
+/* Chat UI background patterns */
+
+/* Main chat background pattern */
+.chat-bg-pattern {
+  background-color: rgba(255, 255, 255, 0.6);
+  background-image: 
+    radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.2) 2%, transparent 0%),
+    radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.2) 2%, transparent 0%);
+  background-size: 100px 100px;
+}
+
+/* Message bubbles styling */
+.message-bubble-user {
+  position: relative;
+  background-image: linear-gradient(135deg, rgba(255, 140, 0, 0.9), rgba(255, 100, 0, 0.9));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 
+              inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.message-bubble-user::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: -8px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-bottom-left-radius: 10px;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.message-bubble-assistant {
+  position: relative;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.message-bubble-assistant::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: -8px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-left: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  border-bottom-right-radius: 10px;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+/* Glassmorphism effect for various elements */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Animated gradient for buttons and accents */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animated-gradient {
+  background: linear-gradient(90deg, #ff7e00, #ff9500, #ff6a00);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Cool pulsing dot animation */
+.dot-pulse {
+  position: relative;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ff7e00;
+  box-shadow: 0 0 0 rgba(255, 126, 0, 0.4);
+  animation: dotPulse 1.5s infinite;
+}
+
+@keyframes dotPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 126, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 126, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 126, 0, 0);
+  }
+}

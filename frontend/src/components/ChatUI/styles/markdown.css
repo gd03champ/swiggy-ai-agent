@@ -1,0 +1,144 @@
+/* Markdown styling for chat messages */
+
+.markdown-content {
+  line-height: 1.5;
+}
+
+/* Headings */
+.markdown-content h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0.75rem 0;
+  color: #2d3748;
+}
+
+.markdown-content h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0.75rem 0;
+  color: #2d3748;
+}
+
+.markdown-content h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0.5rem 0;
+  color: #2d3748;
+}
+
+.markdown-content h4, 
+.markdown-content h5, 
+.markdown-content h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.5rem 0;
+  color: #2d3748;
+}
+
+/* Paragraph */
+.markdown-content p {
+  margin: 0.5rem 0;
+}
+
+/* Lists */
+.markdown-content ul {
+  list-style-type: disc;
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+  margin-left: 1rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+/* Links */
+.markdown-content a {
+  color: #4a5568;
+  text-decoration: underline;
+}
+
+.markdown-content a:hover {
+  color: #2c5282;
+}
+
+/* Emphasis */
+.markdown-content strong,
+.markdown-content b {
+  font-weight: 700;
+  color: #1a365d;
+}
+
+.markdown-content em,
+.markdown-content i {
+  font-style: italic;
+}
+
+/* Code */
+.markdown-content code {
+  font-family: monospace;
+  background-color: #edf2f7;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.markdown-content pre {
+  background-color: #edf2f7;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Blockquotes */
+.markdown-content blockquote {
+  border-left: 4px solid #e2e8f0;
+  padding-left: 0.75rem;
+  margin-left: 0;
+  margin-right: 0;
+  font-style: italic;
+  color: #4a5568;
+}
+
+/* Horizontal Rules */
+.markdown-content hr {
+  border-color: #e2e8f0;
+  margin: 1rem 0;
+}
+
+/* Tables */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.markdown-content table th {
+  background-color: #f7fafc;
+  font-weight: 600;
+}
+
+.markdown-content table tr:nth-child(even) {
+  background-color: #f7fafc;
+}
