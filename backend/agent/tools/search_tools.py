@@ -10,7 +10,7 @@ from langchain_core.tools import tool
 from pymongo import MongoClient
 
 # Import the SwiggyAPIClient
-from backend.services.swiggy_api_client import SwiggyAPIClient
+from ...services.swiggy_api_client import SwiggyAPIClient
 
 # MongoDB setup for user preferences
 client = MongoClient("mongodb://localhost:27017/")
@@ -28,11 +28,78 @@ category_map = {
     "default": "COLLECTION"
 }
 
+# Common cuisines associated with popular food items 
+# This helps the enhanced search tool know which cuisines to check
+food_cuisine_mapping = {
+    "soup": ["Chinese", "North Indian", "Continental"],
+    "pizza": ["Italian", "Fast Food"],
+    "burger": ["Fast Food", "American"],
+    "biryani": ["North Indian", "Mughlai", "Hyderabadi"],
+    "noodles": ["Chinese", "Pan-Asian", "Thai"],
+    "pasta": ["Italian", "Continental"],
+    "sandwich": ["Fast Food", "Cafe", "Healthy Food"],
+    "cake": ["Bakery", "Desserts"],
+    "ice cream": ["Desserts", "Ice Cream"],
+    "coffee": ["Cafe", "Beverages"],
+    "tea": ["Beverages", "Cafe"],
+    "salad": ["Healthy Food", "Continental"],
+    "wrap": ["Fast Food", "Healthy Food"],
+    "rolls": ["Fast Food", "North Indian"],
+    "momos": ["Chinese", "Tibetan"],
+    "dosa": ["South Indian"],
+    "idli": ["South Indian"],
+    "thali": ["North Indian", "South Indian"],
+    "samosa": ["North Indian", "Snacks"],
+    "kebab": ["North Indian", "Mughlai"],
+    "curry": ["North Indian", "South Indian"],
+    "dal": ["North Indian", "Home Food"],
+    "paratha": ["North Indian", "Breakfast"],
+    "default": ["North Indian", "South Indian", "Chinese", "Fast Food", "Continental"]
+}
+
+# Related food terms mapping for expanded keyword matching
+# These are common alternate names or specific varieties of the main food
+related_food_terms = {
+    "soup": ["broth", "shorba", "stew", "chowder", "bisque", "hot and sour", "manchow", 
+             "tomato", "sweet corn", "rasam", "pepper", "noodle soup", "wonton", "creamy"],
+    "pizza": ["margherita", "pepperoni", "cheese", "paneer", "marinara", "sicilian", 
+              "napoletana", "flatbread", "garlic bread"],
+    "burger": ["hamburger", "cheeseburger", "veggie burger", "patty", "bun", "aloo tikki"],
+    "biryani": ["pulao", "dum biryani", "hyderabadi", "lucknowi", "rice"],
+    "noodles": ["hakka", "chow mein", "lo mein", "ramen", "udon", "pasta", "maggi"],
+    "ice cream": ["gelato", "frozen", "sundae", "cone", "scoop", "kulfi"],
+    "coffee": ["espresso", "cappuccino", "latte", "americano", "mocha", "frappe"],
+    "tea": ["chai", "green tea", "black tea", "masala", "herbal", "iced tea"],
+    "default": []
+}
+
+# Sample fallback items for common food categories when no matches are found
+# These provide reasonable defaults to show users even when the search fails
+fallback_items = {
+    "soup": [
+        {"name": "Tomato Soup", "description": "Classic tomato soup made with fresh tomatoes, herbs and cream.", "price": 149.00},
+        {"name": "Sweet Corn Soup", "description": "A creamy blend of corn kernels in vegetable stock.", "price": 159.00},
+        {"name": "Hot and Sour Soup", "description": "Spicy and tangy soup with vegetables and tofu.", "price": 169.00},
+        {"name": "Manchow Soup", "description": "Spicy and hot soup with vegetables and noodles.", "price": 179.00}
+    ],
+    "pizza": [
+        {"name": "Margherita Pizza", "description": "Classic pizza with tomato sauce, mozzarella cheese and basil.", "price": 249.00},
+        {"name": "Pepperoni Pizza", "description": "Pizza topped with pepperoni slices and cheese.", "price": 349.00}
+    ],
+    "burger": [
+        {"name": "Veg Burger", "description": "Vegetable patty with lettuce, tomato and cheese in a soft bun.", "price": 129.00},
+        {"name": "Chicken Burger", "description": "Grilled chicken patty with lettuce and special sauce.", "price": 169.00}
+    ],
+    "default": [
+        {"name": "Popular Dish", "description": "A highly rated dish from this restaurant.", "price": 199.00}
+    ]
+}
+
 @tool
 async def search_restaurants(query: str) -> Dict[str, Any]:
     """
     ONLY use this tool to search for restaurants by category or collection.
-    DO NOT use this tool for food item searches - use search_food_items instead.
+    DO NOT use this tool for food item searches - use search_food_items_enhanced instead.
     
     Examples:
     - "Show me popular restaurants"
@@ -72,6 +139,9 @@ async def search_restaurants(query: str) -> Dict[str, Any]:
         
         # Extract restaurants using the helper method
         restaurants = SwiggyAPIClient.extract_restaurants_from_response(data)
+        
+        # Limit to 10 restaurants to prevent token limit issues
+        restaurants = restaurants[:10]
         
         # Format the results for our frontend
         results = []
@@ -157,7 +227,7 @@ async def search_restaurants_direct(query: str) -> Dict[str, Any]:
                 }
         else:
             # Extract restaurants from search response
-            restaurants = SwiggyAPIClient.extract_restaurants_from_response(data)[:5] # Filter only 5 restaurants for chat
+            restaurants = SwiggyAPIClient.extract_restaurants_from_response(data)[:10] # Limit to 10 restaurants
         
         # Format the results for our frontend
         results = []
@@ -197,140 +267,478 @@ async def search_restaurants_direct(query: str) -> Dict[str, Any]:
         }
 
 @tool
-async def search_food_items(query: str) -> Dict[str, Any]:
+async def search_food_items_enhanced(query: str) -> Dict[str, Any]:
     """
+    Enhanced search for food items across restaurants. Efficiently finds dishes 
+    matching your query using a systematic approach with loop detection.
+    
     ONLY use this tool to search for specific food dishes or menu items.
-    DO NOT use for restaurant searches - use search_restaurants instead.
     
     Examples:
-    - "Find butter chicken dishes"
+    - "Find soup near me"
     - "Search for pizza"
     - "Show me biryani options"
     
     Args:
-        query: Food item name (e.g., "butter chicken", "pizza", "biryani")
+        query: Food item name (e.g., "soup", "pizza", "biryani")
         
     Returns:
-        List of matching food items from various restaurants
+        Dictionary containing matching food items grouped by restaurant,
+        with relevance scores and search metadata
     """
     # Default values
     latitude = 12.9716
     longitude = 77.5946
     user_id = None
+    searched_cuisines = set()
     
-    print(f"[DEBUG] Searching food items with query: {query}")
-    query_lower = query.lower()
+    print(f"[DEBUG] Enhanced food search with query: {query}")
+    query_lower = query.lower().strip()
+    search_term = query_lower
+    
+    # Initialize tracking structures for loop detection
+    searched_terms = set([search_term])
+    searched_restaurant_ids = set()
     results = []
     
+    # Extract key words for search (removing common words)
+    stop_words = {"a", "an", "the", "for", "with", "near", "me", "best", "good", "top", "nearby"}
+    keywords = [word for word in search_term.split() if word not in stop_words]
+    main_keyword = keywords[0] if keywords else search_term
+    
+    # Get related terms for the food item to expand search
+    related_terms = []
+    for food_term, terms in related_food_terms.items():
+        if food_term in search_term:
+            related_terms = terms
+            break
+    
+    if not related_terms and main_keyword in related_food_terms:
+        related_terms = related_food_terms[main_keyword]
+    
+    # If no specific related terms found, use empty list
+    if not related_terms:
+        related_terms = related_food_terms.get("default", [])
+    
+    # Determine cuisines to search based on the food item
+    cuisines_to_search = []
+    
+    # Find matching cuisine from our mapping
+    for food_term, cuisines in food_cuisine_mapping.items():
+        if food_term in search_term:
+            cuisines_to_search = cuisines
+            break
+    
+    # If no specific cuisines found, use default cuisines
+    if not cuisines_to_search:
+        cuisines_to_search = food_cuisine_mapping["default"]
+    
+    # Track relevance scoring
+    relevance_scores = {}
+    
     try:
-        # Direct food search approach - search for the query directly using SwiggyAPIClient
-        search_data = await SwiggyAPIClient.search_restaurants(query, latitude, longitude)
+        print(f"[DEBUG] Step 1: Direct search for '{search_term}'")
+        # STEP 1: Direct search using the exact query
+        search_data = await SwiggyAPIClient.search_restaurants(search_term, latitude, longitude)
         
         if "error" in search_data and search_data.get("needs_fallback", False):
+            print(f"[DEBUG] Search API error: Using fallback collection search")
             # Use fallback search if direct search fails
             search_data = await SwiggyAPIClient.get_restaurants(latitude, longitude, "COLLECTION")
         
-        # Extract restaurant IDs from the search results that potentially match our food
-        restaurant_ids = []
-        restaurants_map = {}  # To store restaurant name by ID
-        
+        # Extract restaurants from search response
+        restaurants = []
         if "error" not in search_data:
-            # Extract restaurants from search response
             restaurants = SwiggyAPIClient.extract_restaurants_from_response(search_data)
-            # Take only first 5 restaurants to limit API calls
+            # Limit to top 5 restaurants to prevent excessive API calls
             restaurants = restaurants[:5]
-            
-            for restaurant in restaurants:
-                if "id" in restaurant:
-                    restaurant_ids.append(restaurant["id"])
-                    restaurants_map[restaurant["id"]] = restaurant.get("name", "Unknown Restaurant")
         
-        # Search for matching food items in extracted restaurants
-        for rest_id in restaurant_ids:
-            try:
-                # Get restaurant's menu
-                restaurant_menu = await get_restaurant_menu(rest_id)
+        # Process found restaurants
+        print(f"[DEBUG] Found {len(restaurants)} restaurants in direct search")
+        for restaurant in restaurants:
+            if "id" in restaurant:
+                rest_id = restaurant["id"]
                 
-                if "error" in restaurant_menu:
-                    print(f"Error fetching menu for restaurant {rest_id}: {restaurant_menu.get('error')}")
+                # Skip if we've already searched this restaurant
+                if rest_id in searched_restaurant_ids:
+                    print(f"[DEBUG] Skipping already searched restaurant: {rest_id}")
                     continue
                 
-                restaurant_name = restaurant_menu.get("restaurant_name", restaurants_map.get(rest_id, "Unknown Restaurant"))
+                # Mark as searched to prevent loops
+                searched_restaurant_ids.add(rest_id)
                 
-                # Extract food items that match the query
-                for category in restaurant_menu.get("menu", []):
-                    category_name = category.get("category", "")
-                    for item in category.get("items", []):
-                        if (query_lower in item.get("name", "").lower() or 
-                            query_lower in item.get("description", "").lower()):
-                            # Format food item image URL if it's a Cloudinary ID
-                            image_url = item.get("image_url")
+                try:
+                    # Get restaurant menu
+                    print(f"[DEBUG] Checking menu for restaurant {rest_id}")
+                    restaurant_menu = await get_restaurant_menu.ainvoke(rest_id)
+                    
+                    if "error" in restaurant_menu:
+                        print(f"[DEBUG] Error fetching menu: {restaurant_menu.get('error')}")
+                        continue
+                    
+                    # Get restaurant name
+                    restaurant_name = restaurant_menu.get("restaurant_name", restaurant.get("name", "Unknown Restaurant"))
+                    
+                    # Extract matching food items
+                    found_items = []
+                    for category in restaurant_menu.get("menu", []):
+                        category_name = category.get("category", "")
+                        
+                        for item in category.get("items", []):
+                            item_name = item.get("name", "").lower()
+                            item_desc = item.get("description", "").lower() if item.get("description") else ""
                             
-                            # Process Cloudinary image ID if present (but not already a URL)
-                            if image_url and isinstance(image_url, str) and not image_url.startswith('http'):
-                                image_url = f"https://res.cloudinary.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_508,h_320,c_fill/{image_url}"
+                            # Calculate relevance score with expanded matching criteria
+                            relevance = 0
+                            
+                            # Direct matches in name (highest priority)
+                            if search_term == item_name:
+                                relevance += 15  # Exact full name match
+                            elif search_term in item_name:
+                                relevance += 10  # Substring match in name
+                            elif main_keyword in item_name:
+                                relevance += 8   # Main keyword in name
                                 
-                            results.append({
-                                "type": "food_item",  # IMPORTANT: Changed type to food_item
-                                "data": {
-                                    "name": item.get("name"),
-                                    "description": item.get("description", ""),
-                                    "price": item.get("price"),
-                                    "image_url": image_url,
-                                    "restaurant_name": restaurant_name,
-                                    "restaurant_id": rest_id,
-                                    "category": category_name
+                            # Check for any related terms in the name
+                            for term in related_terms:
+                                if term in item_name:
+                                    relevance += 6   # Related term in name
+                                    break
+                            
+                            # Check for keyword matches in name
+                            if any(kw in item_name for kw in keywords):
+                                relevance += 5   # Any keyword in name
+                                
+                            # Check description
+                            if search_term in item_desc:
+                                relevance += 4   # Search term in description
+                            elif main_keyword in item_desc:
+                                relevance += 3   # Main keyword in description
+                                
+                            # Check for any related terms in the description
+                            for term in related_terms:
+                                if term in item_desc:
+                                    relevance += 2   # Related term in description
+                                    break
+                                    
+                            # Check categories - some restaurants put soup types in category names
+                            if search_term in category_name.lower():
+                                relevance += 5   # Search term in category
+                                
+                            # Check for partial matches (e.g., "soup" in "Noodle Soup")
+                            if item_name.split() and search_term in [part.lower() for part in item_name.split()]:
+                                relevance += 7   # Word boundary match
+                            
+                            # Only include items with some relevance
+                            if relevance > 0:
+                                # Format food item image URL
+                                image_url = item.get("image_url")
+                                if image_url and isinstance(image_url, str) and not image_url.startswith('http'):
+                                    image_url = f"https://res.cloudinary.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_508,h_320,c_fill/{image_url}"
+                                
+                                food_item = {
+                                    "type": "food_item",
+                                    "data": {
+                                        "name": item.get("name"),
+                                        "description": item.get("description", ""),
+                                        "price": item.get("price"),
+                                        "image_url": image_url,
+                                        "restaurant_name": restaurant_name,
+                                        "restaurant_id": rest_id,
+                                        "category": category_name,
+                                        "relevance_score": relevance,
+                                        "match_type": "direct" if relevance >= 8 else "partial"
+                                    }
                                 }
-                            })
-            except Exception as e:
-                print(f"Error processing menu for restaurant {rest_id}: {str(e)}")
-                continue
+                                
+                                found_items.append(food_item)
+                                
+                                # Store for global sorting
+                                item_id = f"{rest_id}:{item.get('name')}"
+                                relevance_scores[item_id] = relevance
+                    
+                    # Add found items to results
+                    results.extend(found_items)
+                    print(f"[DEBUG] Found {len(found_items)} matching items in restaurant {restaurant_name}")
+                    
+                    # Early stopping: If we found more than 3 good matches, we can stop
+                    if len([item for item in found_items if relevance_scores.get(f"{rest_id}:{item['data']['name']}", 0) >= 8]) >= 3:
+                        print(f"[DEBUG] Found enough high-quality matches, stopping early")
+                        break
+                        
+                except Exception as e:
+                    print(f"[DEBUG] Error processing restaurant {rest_id}: {e}")
         
-        # Update user preferences if user_id is provided
-        if user_id:
-            user_prefs_collection.update_one(
-                {"user_id": user_id},
-                {"$addToSet": {"food_preferences": query}},
-                upsert=True
+        # STEP 2: If we didn't find enough results, search by cuisine
+        if len(results) < 3:
+            print(f"[DEBUG] Step 2: Searching by cuisines {cuisines_to_search}")
+            
+            for cuisine in cuisines_to_search[:3]:  # Search up to 3 cuisines
+                if cuisine in searched_cuisines:
+                    continue
+                    
+                searched_cuisines.add(cuisine)
+                print(f"[DEBUG] Searching for {cuisine} restaurants")
+                
+                try:
+                    # Search for restaurants of this cuisine
+                    cuisine_search_data = await SwiggyAPIClient.search_restaurants(cuisine, latitude, longitude)
+                    
+                    if "error" in cuisine_search_data:
+                        print(f"[DEBUG] Error searching {cuisine} restaurants")
+                        continue
+                    
+                    cuisine_restaurants = SwiggyAPIClient.extract_restaurants_from_response(cuisine_search_data)
+                    cuisine_restaurants = cuisine_restaurants[:3]  # Limit to top 3
+                    
+                    # Check each restaurant's menu
+                    for restaurant in cuisine_restaurants:
+                        if "id" in restaurant:
+                            rest_id = restaurant["id"]
+                            
+                            # Skip if already searched
+                            if rest_id in searched_restaurant_ids:
+                                continue
+                                
+                            searched_restaurant_ids.add(rest_id)
+                            
+                            try:
+                                # Get menu
+                                restaurant_menu = await get_restaurant_menu.ainvoke(rest_id)
+                                
+                                if "error" in restaurant_menu:
+                                    continue
+                                
+                                restaurant_name = restaurant_menu.get("restaurant_name", restaurant.get("name", "Unknown Restaurant"))
+                                
+                                # Check menu for matching items including related terms
+                                cuisine_items = []
+                                for category in restaurant_menu.get("menu", []):
+                                    category_name = category.get("category", "")
+                                    
+                                    for item in category.get("items", []):
+                                        item_name = item.get("name", "").lower()
+                                        item_desc = item.get("description", "").lower() if item.get("description") else ""
+                                        
+                                        # Calculate relevance score with expanded criteria
+                                        relevance = 0
+                                        
+                                        # Direct matches in name (highest priority)
+                                        if search_term == item_name:
+                                            relevance += 15  # Exact match
+                                        elif search_term in item_name:
+                                            relevance += 10  # Substring match
+                                        elif main_keyword in item_name:
+                                            relevance += 8   # Main keyword
+                                        
+                                        # Check for related terms in name
+                                        for term in related_terms:
+                                            if term in item_name:
+                                                relevance += 6   # Related term in name
+                                                break
+                                        
+                                        # Check for keyword matches
+                                        if any(kw in item_name for kw in keywords):
+                                            relevance += 5   # Any keyword
+                                            
+                                        # Check description
+                                        if search_term in item_desc:
+                                            relevance += 4   # Search term in description
+                                        elif main_keyword in item_desc:
+                                            relevance += 3   # Main keyword in description
+                                            
+                                        # Check for related terms in description
+                                        for term in related_terms:
+                                            if term in item_desc:
+                                                relevance += 2   # Related term in description
+                                                break
+                                                
+                                        # Check category name
+                                        if search_term in category_name.lower():
+                                            relevance += 5   # Search term in category
+                                            
+                                        # Only include items with some relevance
+                                        if relevance > 0:
+                                            # Format image URL
+                                            image_url = item.get("image_url")
+                                            if image_url and isinstance(image_url, str) and not image_url.startswith('http'):
+                                                image_url = f"https://res.cloudinary.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_508,h_320,c_fill/{image_url}"
+                                            
+                                            food_item = {
+                                                "type": "food_item",
+                                                "data": {
+                                                    "name": item.get("name"),
+                                                    "description": item.get("description", ""),
+                                                    "price": item.get("price"),
+                                                    "image_url": image_url,
+                                                    "restaurant_name": restaurant_name,
+                                                    "restaurant_id": rest_id,
+                                                    "category": category_name,
+                                                    "relevance_score": relevance,
+                                                    "match_type": "direct" if relevance >= 8 else "partial"
+                                                }
+                                            }
+                                            
+                                            cuisine_items.append(food_item)
+                                            
+                                            # Store for global sorting
+                                            item_id = f"{rest_id}:{item.get('name')}"
+                                            relevance_scores[item_id] = relevance
+                                
+                                # Add found items to results
+                                results.extend(cuisine_items)
+                                print(f"[DEBUG] Found {len(cuisine_items)} matching items in {cuisine} restaurant {restaurant_name}")
+                                
+                                # Early stopping for cuisine search as well
+                                if len([item for item in cuisine_items if relevance_scores.get(f"{rest_id}:{item['data']['name']}", 0) >= 8]) >= 3:
+                                    print(f"[DEBUG] Found enough high-quality matches in cuisine search, stopping early")
+                                    break
+                            except Exception as e:
+                                print(f"[DEBUG] Error processing restaurant {rest_id}: {e}")
+                                
+                except Exception as e:
+                    print(f"[DEBUG] Error searching {cuisine} restaurants: {e}")
+        
+        # STEP 3: Sort results by relevance and organize by restaurant
+        print(f"[DEBUG] Step 3: Organizing results by relevance")
+        
+        # Group results by restaurant
+        restaurants_with_items = {}
+        for item in results:
+            if "data" in item:
+                rest_id = item["data"].get("restaurant_id")
+                rest_name = item["data"].get("restaurant_name", "Unknown Restaurant")
+                
+                if rest_id not in restaurants_with_items:
+                    restaurants_with_items[rest_id] = {
+                        "name": rest_name,
+                        "items": []
+                    }
+                
+                # Add relevance score to item for easier sorting
+                relevance = item["data"].get("relevance_score", 0)
+                item["data"]["relevance_score"] = relevance
+                
+                restaurants_with_items[rest_id]["items"].append(item)
+        
+        # Sort items within each restaurant by relevance
+        for rest_id, restaurant_data in restaurants_with_items.items():
+            restaurant_data["items"].sort(
+                key=lambda item: item["data"].get("relevance_score", 0),
+                reverse=True
             )
         
-        # Return the results
+        # If no results were found, provide fallback results for common food categories
         if not results:
-            return {
-                "message": f"No food items found matching '{query}'",
-                "suggestions": ["Try a broader search term", 
-                               "Try a different food category like 'pizza' or 'burger'", 
-                               "Try searching for a specific dish"]
-            }
+            print(f"[DEBUG] No results found, checking if fallback items available for {search_term}")
+            fallback_category = None
+            
+            # Find matching fallback category
+            for category in fallback_items:
+                if category in search_term:
+                    fallback_category = category
+                    break
+            
+            # If no direct match, try with main keyword
+            if not fallback_category and main_keyword in fallback_items:
+                fallback_category = main_keyword
+            
+            # If we have fallback items for this category
+            if fallback_category:
+                print(f"[DEBUG] Providing fallback items for {fallback_category}")
+                fallback_dishes = fallback_items.get(fallback_category, fallback_items["default"])
+                
+                # Create artificial restaurant for fallback items
+                fallback_rest_id = "fallback_restaurant"
+                fallback_rest_name = f"Suggested {fallback_category.title()} dishes"
+                
+                # Add each fallback item
+                for item in fallback_dishes:
+                    food_item = {
+                        "type": "food_item",
+                        "data": {
+                            "name": item.get("name"),
+                            "description": item.get("description", ""),
+                            "price": item.get("price"),
+                            "image_url": "",  # No image for fallback items
+                            "restaurant_name": fallback_rest_name,
+                            "restaurant_id": fallback_rest_id,
+                            "category": f"{fallback_category.title()} Dishes",
+                            "relevance_score": 5,  # Medium relevance
+                            "match_type": "suggested"
+                        }
+                    }
+                    results.append(food_item)
+                
+                # Add to restaurant mapping
+                restaurants_with_items[fallback_rest_id] = {
+                    "name": fallback_rest_name,
+                    "items": results
+                }
+                
+                return {
+                    "results": results,
+                    "result_type": "food_items_enhanced",
+                    "restaurants": [
+                        {
+                            "id": fallback_rest_id,
+                            "name": fallback_rest_name,
+                            "items": results
+                        }
+                    ],
+                    "search_metadata": {
+                        "search_term": search_term,
+                        "cuisines_searched": list(searched_cuisines),
+                        "restaurants_searched": len(searched_restaurant_ids),
+                        "total_items_found": len(results),
+                        "using_fallback": True
+                    },
+                    "message": f"No exact matches found for '{query}', showing suggested {fallback_category} options"
+                }
+            else:
+                # No results and no fallback available
+                return {
+                    "message": f"No food items found matching '{query}'",
+                    "search_metadata": {
+                        "search_term": search_term,
+                        "cuisines_searched": list(searched_cuisines),
+                        "restaurants_searched": len(searched_restaurant_ids),
+                        "total_items_found": 0
+                    },
+                    "suggestions": [
+                        "Try a broader search term",
+                        "Try a different food category like 'pizza' or 'burger'",
+                        "Try searching for a specific dish"
+                    ]
+                }
         
-        # Add metadata to help with multi-step reasoning
-        unique_restaurants = set()
-        restaurant_map = {}
+        # Limit total results to 20 items to prevent token limit issues
+        results = results[:20]
         
-        for result in results:
-            if "data" in result:
-                rest_id = result["data"].get("restaurant_id")
-                rest_name = result["data"].get("restaurant_name", "Unknown Restaurant")
-                if rest_id:
-                    unique_restaurants.add(rest_id)
-                    restaurant_map[rest_id] = rest_name
-        
-        # Return explicitly typed food_item results with metadata
+        # Return organized results with metadata
         return {
-            "results": results, 
-            "result_type": "food_items",
-            "metadata": {
-                "restaurant_count": len(unique_restaurants),
-                "found_in_restaurants": [
-                    {"id": rest_id, "name": restaurant_map[rest_id]}
-                    for rest_id in unique_restaurants
-                ],
-                "food_item_count": len(results)
+            "results": results,
+            "result_type": "food_items_enhanced",
+            "restaurants": [
+                {
+                    "id": rest_id,
+                    "name": data["name"],
+                    "items": data["items"][:3]  # Limit to top 3 items per restaurant
+                }
+                for rest_id, data in restaurants_with_items.items()
+            ],
+            "search_metadata": {
+                "search_term": search_term,
+                "cuisines_searched": list(searched_cuisines),
+                "restaurants_searched": len(searched_restaurant_ids),
+                "total_items_found": len(results)
             }
         }
             
     except Exception as e:
-        print(f"Error in search_food_items: {str(e)}")
+        print(f"[DEBUG] Error in search_food_items_enhanced: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "message": f"Error searching for food items: {str(e)}",
             "suggestions": ["Please try again later", "Try with a different search term"]
@@ -390,32 +798,40 @@ async def get_restaurant_menu(restaurant_id: str) -> Dict[str, Any]:
             if first_category.get("items") and len(first_category["items"]) > 0:
                 featured_items = first_category["items"][:3]  # Take first 3 items
         
-        # Format menu data
+        # Format menu data - limit to 20 items total across all categories
         food_items = []
+        item_count = 0
         for category in menu_data.get("menu", []):
+            if item_count >= 20:
+                break
+                
             category_name = category.get("category", "")
             for item in category.get("items", []):
-                            # Add restaurant context to each food item
-                            # Make sure image_url is properly formatted for Cloudinary
-                            image_url = item.get("image_url")
-                            
-                            # Process Cloudinary image ID if present (but not already a URL)
-                            if image_url and isinstance(image_url, str) and not image_url.startswith('http'):
-                                image_url = f"https://res.cloudinary.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_508,h_320,c_fill/{image_url}"
-                            
-                            food_item = {
-                                "type": "food_item",
-                                "data": {
-                                    "name": item.get("name"),
-                                    "description": item.get("description", ""),
-                                    "price": item.get("price"),
-                                    "image_url": image_url,
-                                    "restaurant_name": restaurant_name,
-                                    "restaurant_id": restaurant_id,
-                                    "category": category_name
-                                }
-                            }
-                            food_items.append(food_item)
+                if item_count >= 20:
+                    break
+                    
+                # Add restaurant context to each food item
+                # Make sure image_url is properly formatted for Cloudinary
+                image_url = item.get("image_url")
+                
+                # Process Cloudinary image ID if present (but not already a URL)
+                if image_url and isinstance(image_url, str) and not image_url.startswith('http'):
+                    image_url = f"https://res.cloudinary.com/swiggy/image/upload/fl_lossy,f_auto,q_auto,w_508,h_320,c_fill/{image_url}"
+                
+                food_item = {
+                    "type": "food_item",
+                    "data": {
+                        "name": item.get("name"),
+                        "description": item.get("description", ""),
+                        "price": item.get("price"),
+                        "image_url": image_url,
+                        "restaurant_name": restaurant_name,
+                        "restaurant_id": restaurant_id,
+                        "category": category_name
+                    }
+                }
+                food_items.append(food_item)
+                item_count += 1
         
         # Format the output for better structured data handling
         result = {

@@ -3,6 +3,9 @@ import ProductCard from '../cards/ProductCard';
 import RestaurantCard from '../cards/RestaurantCard';
 import OrderDetails from '../cards/OrderDetails';
 import RefundStatus from '../cards/RefundStatus';
+import DocumentAnalysisResult from '../cards/DocumentAnalysisResult';
+import ImageVerificationStatus from '../indicators/ImageVerificationStatus';
+import RefundWorkflowStatus from '../indicators/RefundWorkflowStatus';
 
 /**
  * Enhanced utility function to render the appropriate component based on structured data type
@@ -153,7 +156,43 @@ const renderStructuredData = (type, data) => {
       
       console.log("[RENDER] Passing refund data to RefundStatus component:", refundData);
       return <RefundStatus refund={refundData} />;
-      default:
+      
+    case 'image_verification_result':
+      console.log("[RENDER] Rendering ImageVerificationStatus with data:", processedData);
+      return <ImageVerificationStatus verificationResult={processedData} />;
+      
+    case 'refund_workflow_state':
+      console.log("[RENDER] Rendering RefundWorkflowStatus with data:", processedData);
+      return <RefundWorkflowStatus workflowState={processedData} />;
+      
+    case 'document_analysis_result':
+      console.log("[RENDER] Rendering DocumentAnalysisResult with data:", processedData);
+      return <DocumentAnalysisResult analysis={processedData} />;
+      
+    case 'dietary_recommendations':
+      console.log("[RENDER] Rendering dietary recommendations as document analysis:", processedData);
+      // Transform dietary recommendations to a format suitable for DocumentAnalysisResult
+      const dietaryData = {
+        document_type: 'diet_plan',
+        analysis_confidence: 90,
+        dietary_goals: processedData.dietary_approach,
+        foods_recommended: processedData.foods_to_emphasize,
+        foods_to_avoid: processedData.foods_to_limit,
+        meal_plan: [
+          { meal: "Breakfast", foods: processedData.meal_plan?.breakfast || [] },
+          { meal: "Lunch", foods: processedData.meal_plan?.lunch || [] },
+          { meal: "Dinner", foods: processedData.meal_plan?.dinner || [] },
+          { meal: "Snacks", foods: processedData.meal_plan?.snacks || [] }
+        ],
+        special_instructions: processedData.special_considerations,
+        patient_info: {
+          other_details: `Medical condition: ${processedData.condition}` +
+            (processedData.restrictions?.length ? `\nDietary restrictions: ${processedData.restrictions.join(', ')}` : '')
+        }
+      };
+      return <DocumentAnalysisResult analysis={dietaryData} />;
+      
+    default:
         // For debugging - show the unrecognized data
         console.log('Unrecognized data type:', processedType);
         console.log('Data:', processedData);

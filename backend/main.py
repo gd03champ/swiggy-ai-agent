@@ -14,6 +14,9 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any, AsyncGenerator
 from fastapi.middleware.cors import CORSMiddleware
 
+# Import MongoDB client for order storage
+from pymongo import MongoClient
+
 # Import our chatbot agent
 from backend.agent.agent import ChatbotAgent
 
@@ -30,8 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory database for orders and conversations
-orders_db = {}
+# MongoDB setup - consistent with order_tools.py
+mongo_client = MongoClient("mongodb://localhost:27017/")
+db = mongo_client["restaurant_db"]
+orders_collection = db["placed_orders"]
+
+# In-memory database for conversations only (orders now in MongoDB)
 conversations_db = {}
 
 # Model for the restaurant request parameters
@@ -63,37 +70,58 @@ async def create_order(order: Order):
         # Calculate total price
         total_price = sum(food.price * food.quantity for food in order.foods)
 
-        # Create order document
-        order_id = str(uuid.uuid4())
-        
+        # Create order document compatible with MongoDB and get_order_details tool
         order_doc = {
-            "order_id": order_id,
+            # No "order_id" field as MongoDB will create its own _id
             "foods": [food.dict() for food in order.foods],
             "total_price": total_price,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "status": "Order Placed"  # Add status field
         }
 
-        # Save to in-memory database
-        orders_db[order_id] = order_doc
-
+        # Insert into MongoDB
+        result = orders_collection.insert_one(order_doc)
+        
+        # Get the MongoDB ObjectId as string
+        order_id = str(result.inserted_id)
+        
+        print(f"Order created successfully with ID: {order_id}")
+        
         # Return order details
         return {
             "order_id": order_id,
             "foods": order.foods,
-            "total_price": total_price
+            "total_price": total_price,
+            "status": "Order Placed"
         }
     except Exception as e:
+        print(f"Error creating order: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/get_order/{order_id}")
 async def get_order(order_id: str):
     try:
-        # Find order by ID
-        if order_id in orders_db:
-            return orders_db[order_id]
+        from bson import ObjectId
+        
+        # Try to convert string ID to MongoDB ObjectId
+        try:
+            obj_id = ObjectId(order_id)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid order ID format")
+            
+        # Find order by ID in MongoDB
+        order = orders_collection.find_one({"_id": obj_id})
+        
+        if order:
+            # Convert MongoDB ObjectId to string for JSON response
+            order["_id"] = str(order["_id"])
+            return order
         else:
             raise HTTPException(status_code=404, detail="Order not found")
+    except HTTPException as he:
+        raise he
     except Exception as e:
+        print(f"Error retrieving order: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
 

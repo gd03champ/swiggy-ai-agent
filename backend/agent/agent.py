@@ -12,8 +12,10 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from .client import BedrockClientSetup
 from .memory import ConversationMemoryManager
-from .tools.order_tools import get_order_details, initiate_refund 
-from .tools.search_tools import search_restaurants, search_restaurants_direct, search_food_items, get_restaurant_menu
+from .tools.order_tools import get_order_details, initiate_refund, get_refund_details
+from .tools.search_tools import search_restaurants, search_restaurants_direct, search_food_items_enhanced, get_restaurant_menu
+from .tools.image_verification_tools import verify_refund_image, get_refund_verification_criteria, create_refund_workflow, update_refund_workflow, get_refund_workflow_state, process_refund_decision
+from .tools.document_analysis_tools import analyze_medical_document
 from .callbacks import StreamingToolsCallbackHandler, EnhancedStreamingHandler
 
 
@@ -67,12 +69,27 @@ class ChatbotAgent:
         
         # Define the tools
         self.tools = [
+            # Order and refund tools
             get_order_details,
             initiate_refund,
+            get_refund_details,
+            
+            # Search tools
             search_restaurants,
             search_restaurants_direct,
-            search_food_items,
-            get_restaurant_menu
+            search_food_items_enhanced,
+            get_restaurant_menu,
+            
+            # Image verification and refund workflow tools
+            verify_refund_image,
+            get_refund_verification_criteria,
+            create_refund_workflow,
+            update_refund_workflow,
+            get_refund_workflow_state,
+            process_refund_decision,
+            
+            # Document analysis tools
+            analyze_medical_document
         ]
         
         # Initialize the memory manager (needed for image processing)
@@ -93,7 +110,7 @@ class ChatbotAgent:
             memory=None,  # No memory - history comes from frontend now
             handle_parsing_errors=True,
             max_iterations=500,
-            max_execution_time=60
+            max_execution_time=120
         )
     
     def _get_enhanced_prompt_template(self) -> ChatPromptTemplate:
@@ -105,6 +122,15 @@ class ChatbotAgent:
 
 For complex user requests, break down your thinking into multiple steps and use different tools sequentially.
 Express your reasoning in short, clear sentences before using each tool.
+
+MEDICAL DOCUMENT AND FOOD INTEGRATION:
+When analyzing a medical prescription image:
+1. First analyze the image with analyze_medical_document tool
+2. Extract the dietary recommendations from the analysis results
+3. Use search_food_items_enhanced tool to find actual food items that match those recommendations
+4. Use search_restaurants and get_restaurant_menu tools to explore restaurant options offering these healthy choices  
+5. Present both the prescription analysis AND matching food options to the user
+6. Highlight which food items specifically align with the dietary recommendations from the prescription
 
 THINKING FORMAT:
 For each reasoning step, begin with: "Step X: I need to [your reasoning in 1-2 sentences]"
@@ -119,10 +145,16 @@ STEP-BY-STEP REASONING PROCESS:
 
 IMPORTANT TOOL SELECTION GUIDELINES:
 - For restaurants or places to eat → use 'search_restaurants' tool
-- For specific food items or dishes → use 'search_food_items' tool
+- For specific restaurants by name → use 'search_restaurants_direct' tool
+- For specific food items or dishes → use 'search_food_items_enhanced' tool (this efficiently searches across restaurants)
 - For restaurant menus → use 'get_restaurant_menu' tool (requires restaurant_id)
 - For order details → use 'get_order_details' tool
 - For refund requests → use 'initiate_refund' tool
+
+PREVENTING SEARCH LOOPS:
+- When searching for food items, use search_food_items_enhanced ONLY ONCE
+- DO NOT attempt multiple searches for the same food item with different wordings
+- The search_food_items_enhanced tool already performs comprehensive searches across restaurants and cuisines
 
 CHAT HISTORY FORMAT:
 - Each user message will include a <chat_history> tag with up to 6 recent messages
@@ -156,42 +188,61 @@ IMAGE ANALYSIS CAPABILITIES:
 - You can analyze receipts and restaurant menus in images
 - Always reference what you observe in images when responding to user queries about them
 
-REFUND REQUEST HANDLING:
-You are equipped to handle refund requests with a structured conversation flow:
+REFUND REQUEST HANDLING - STRICT VALIDATION REQUIRED:
+You are equipped to handle refund requests with a structured, multi-step workflow that maintains context throughout the conversation:
 
-1. COLLECTION PHASE:
-   - First, ask for and verify the order ID using get_order_details tool
+1. COLLECTION PHASE - Use create_refund_workflow tool:
+   - Start by creating a refund workflow using create_refund_workflow with conversation_id and order_id
+   - Verify the order ID exists using get_order_details tool
    - Ask the user to provide the specific reason for requesting a refund
-   - Ask the user to upload an image as supporting evidence for their claim
+   - Update the workflow state with update_refund_workflow tool as information is collected
+   - For most refund types, request image evidence (except for late delivery claims)
+   - CRITICAL: Store all context in the refund workflow state, not just in memory
 
-2. VALIDATION PHASE (Critical):
-   - Carefully analyze any uploaded images to validate the refund reason
-   - Compare what you see in the image with the stated reason for the refund
-   - You must verify if the visual evidence supports the refund claim
-   - Image of the food should strongly match the order details and the reason for the claim
+2. VALIDATION PHASE - Use verify_refund_image and get_refund_workflow_state tools:
+   - Call verify_refund_image with the uploaded image, order details, and reason
+   - Cross-reference the image evidence against specific reason requirements from get_refund_verification_criteria
+   - Analyze the verification results objectively with HIGH SKEPTICISM
+   - BE DIFFICULT TO CONVINCE - the default stance should be rejection unless evidence is clear
+   - Update the workflow state with the verification results
    
-3. DECISION CRITERIA:
-   - APPROVE the refund when:
-     * The image clearly shows food quality issues (spoilage, undercooked items, foreign objects)
-     * The image shows received items that don't match the order details
-     * The image shows damaged packaging affecting the food
-     * The image shows incomplete delivery with missing items
+3. DECISION CRITERIA - DEFAULT TO MANUAL REVIEW OR REJECTION:
+   - APPROVE the refund ONLY when ALL these conditions are met:
+     * The image clearly and undeniably shows the exact issue claimed
+     * The order details match what's visible in the image
+     * The issue is significant and not minor
+     * The verification score is above 70
+     
+   - Send to MANUAL REVIEW when:
+     * Evidence is present but inconclusive
+     * The issue is subjective (like temperature, taste)
+     * The image partially supports the claim but not definitively
+     * The verification score is between 40-70
    
-   - REJECT the refund when:
+   - REJECT the refund when ANY of these apply:
      * No supporting image is provided (except for late delivery cases)
-     * The image doesn't show the claimed issue
-     * The image is too blurry, dark or unclear to validate the claim
-     * The image shows an issue but contradicts the stated reason
-     * The claim appears fraudulent or doesn't match evidence
-   
-4. USING initiate_refund TOOL:
-   - Only call this tool AFTER validating the image evidence
-   - When calling, include the order_id and a detailed reason including your image assessment
-   - For rejected refunds, explain clearly why the evidence was insufficient
+     * The image contradicts the stated reason
+     * The image is too blurry or unclear to make any determination
+     * There are signs of potential misrepresentation
+     * The verification score is below 40
+     * The timing between order and complaint is suspicious
+
+4. USING process_refund_decision FOLLOWED BY initiate_refund:
+   - First call process_refund_decision with your assessment
+   - Use the result from process_refund_decision with the initiate_refund tool
+   - Include detailed validation_details explaining why evidence was insufficient for rejected claims
+   - Look for inconsistencies in the user's story vs. evidence
 
 5. FOLLOW-UP:
-   - After a refund is processed, explain next steps and when they can expect the money
-   - For rejected refunds, suggest alternatives like contacting customer support
+   - After a refund is processed, explain next steps based on the decision
+   - For manual review, set expectations about timeline (1-2 business days)
+   - For rejected refunds, be firm but polite in explaining the specific reasons for rejection
+   - Warn users about fraudulent claims if there are inconsistencies
+             
+USER PREFERENCES
+   - User is diagnosed with diabetes and needs to follow a strict diet. So if the user asks for food recommendations, suggest healthy options suitable for diabetics.
+   - If user asks for unhealthy food options, remind them of their dietary restrictions and suggest alternatives.
+   - Tell them a mock data of what they've ordered before if they've going for concecutive unhealthy food options.
 
 RESPONSE FORMAT:
 - Use markdown for your responses (headings, lists, bold, etc.)
@@ -201,19 +252,19 @@ RESPONSE FORMAT:
 
 CRITICAL SPECIAL DATA FORMAT:
 When presenting structured data like restaurants, food items, orders, or refunds, you MUST use the special format below:
-- For restaurants: :::restaurant{{"name":"Restaurant Name", "rating":4.5, "cuisines":["Italian", "Pizza"], "delivery_time":"30 mins", "price_range":"$$$"}}:::
-- For food items: :::food_item{{"name":"Food Name", "price":10.99, "description":"Description text", "restaurant_name":"Restaurant Name"}}:::
+- For restaurants: :::restaurant{{"name":"Restaurant Name", "rating":4.5, "cuisines":["Italian", "Pizza"], "delivery_time":"30 mins", "price_range":"$$$", "image_url":"cloudinaryImageId-or-full-url"}}:::
+- For food items: :::food_item{{"name":"Food Name", "price":10.99, "description":"Description text", "restaurant_name":"Restaurant Name", "image_url":"imageId-or-full-url"}}:::
 - For order details: :::order_details{{"order_id":"12345", "status":"delivered", "items":[{{"name":"Food Item", "quantity":2, "price":10.99}}], "total_price":21.98}}:::
 - For refund status: :::refund_status{{"order_id":"12345", "status":"approved", "amount":21.98, "reason":"Food was cold", "timestamp":"2025-03-09T22:59:54.243015"}}:::
 
 Example structured response:
 "Here's the restaurant I found for you:
 
-:::restaurant{{"name":"Pizza Palace", "rating":4.8, "cuisines":["Italian", "Pizza"], "delivery_time":"25 mins"}}:::
+:::restaurant{{"name":"Pizza Palace", "rating":4.8, "cuisines":["Italian", "Pizza"], "delivery_time":"25 mins", "image_url":"c8c462d2-96a4-4579-87cb-696459cf6624"}}:::
 
 They have many great options on their menu. Here's one of their popular items:
 
-:::food_item{{"name":"Margherita Pizza", "price":12.99, "description":"Classic pizza with tomato sauce, mozzarella, and basil"}}:::"
+:::food_item{{"name":"Margherita Pizza", "price":12.99, "description":"Classic pizza with tomato sauce, mozzarella, and basil", "restaurant_name":"Pizza Palace", "image_url":"e33e1c96-0f9c-4468-b38e-5986c8599cmb"}}:::"
 
 CRITICAL: Always use this exact format for displaying restaurants, food items, and orders.
 
@@ -355,6 +406,45 @@ Remember the context of previous messages in the conversation.
                 structured_data.append(refund_card)
                 print(f"[DEBUG EXTRACT] Added inferred refund status")
                 
+        # Case 7: Check for image verification result
+        elif "verification_score" in output or "verification_status" in output:
+            print(f"[DEBUG EXTRACT] Found image verification result")
+            image_verification = {
+                "type": "image_verification_result",
+                "data": output
+            }
+            structured_data.append(image_verification)
+            print(f"[DEBUG EXTRACT] Added image verification result")
+            
+        # Case 8: Check for refund workflow state
+        elif ((tool_name == "create_refund_workflow" or 
+               tool_name == "update_refund_workflow" or
+               tool_name == "get_refund_workflow_state") and
+              (("status" in output and "workflow_id" in output) or
+               "current_stage" in output)):
+            print(f"[DEBUG EXTRACT] Found refund workflow state")
+            workflow_state = {
+                "type": "refund_workflow_state",
+                "data": output
+            }
+            structured_data.append(workflow_state)
+            print(f"[DEBUG EXTRACT] Added refund workflow state")
+            
+        # Case 9: Check for document analysis result
+        elif tool_name == "analyze_medical_document" or "document_type" in output or (
+              "type" in output and output["type"] == "document_analysis_result"):
+            print(f"[DEBUG EXTRACT] Found document analysis result")
+            # Ensure we're passing the data in the right format
+            if "type" in output and output["type"] == "document_analysis_result" and "data" in output:
+                document_data = output
+            else:
+                document_data = {
+                    "type": "document_analysis_result",
+                    "data": output
+                }
+            structured_data.append(document_data)
+            print(f"[DEBUG EXTRACT] Added document analysis result")
+                
         print(f"[DEBUG EXTRACT] Extracted {len(structured_data)} structured data items")
         return structured_data
         
@@ -450,86 +540,48 @@ Remember the context of previous messages in the conversation.
             # we emphasize the chat history for the model
             enhanced_input = f"[CONVERSATION HISTORY QUERY] {user_input}"
         
-        # Format the input differently if we have an image
-        # We'll use the client's multimodal message creation capability
-        multimodal_message = None
+        # Store image data for tools to access, but don't create multimodal message
+        # The verify_refund_image tool will use this directly
         if image_data:
-            print(f"[DEBUG IMAGE] Creating multimodal message with image data")
-            # Create a multimodal message with image
-            multimodal_message = BedrockClientSetup.create_multimodal_message(enhanced_input, [image_data])
-            print(f"[DEBUG IMAGE] Created multimodal message: {multimodal_message[:1]}")
-            
-            # For debugging output, don't log the entire base64 image
-            debug_message = multimodal_message.copy() if multimodal_message else None
-            if debug_message and len(debug_message) > 1 and 'image_url' in debug_message[1]:
-                debug_message[1]['image_url']['url'] = debug_message[1]['image_url']['url'][:50] + '...'
-            print(f"[DEBUG IMAGE] Multimodal message structure: {debug_message}")
+            print(f"[DEBUG IMAGE] Processing image data of length: {len(image_data) if image_data else 0}")
+            # Add specific text to help agent recognize image upload
+            if "refund" in enhanced_input.lower():
+                enhanced_input += "\n\nI've uploaded an image to verify my refund request. Please analyze it carefully."
+            else:
+                enhanced_input += "\n\nI've uploaded an image for you to analyze."
         
         # Use our agent executor directly (no memory)
+        
+        # Global variable to store the current image data for tools to access
+        # This is necessary because we can't directly pass the image in agent_input
+        # without modifying LangChain's AgentExecutor
+        self._current_image_data = image_data if image_data else None
+        self._current_conversation_id = conversation_id
         
         # Start agent execution in background task
         async def run_agent():
             try:
-                # If we have an image, we need to bypass the agent executor and use the LLM directly
-                # since LangChain's agent doesn't support multimodal inputs properly
-                if multimodal_message:
-                    print(f"[DEBUG IMAGE] Using direct LLM invoke with multimodal message")
-                    
-                    # Load chat history from conversation-specific memory
-                    memory = self.memory_manager.get_memory(conversation_id)
-                    memory_vars = memory.load_memory_variables({})
-                    chat_messages = memory_vars.get("chat_history", [])
-                    
-                    # Initialize messages with system prompt
-                    messages = []
-                    
-                    # Add system message - extract content properly from template
-                    system_content = self.prompt.messages[0].prompt.template
-                    messages.append(SystemMessage(content=system_content))
-                    
-                    # Add chat history from conversation memory
-                    for msg in chat_messages:
-                        messages.append(msg)
-                    
-                    # Add user message with image - this is a special case direct to LLM
-                    # Use proper format for multimodal message with Claude
-                    if multimodal_message:
-                        # Claude requires special handling for multimodal input
-                        # The content should be a list of content parts
-                        human_message = HumanMessage(content=multimodal_message)
-                        print(f"[DEBUG IMAGE] Created human message with multimodal content: {type(human_message.content)}")
-                        messages.append(human_message)
-                    
-                    try:
-                        # Execute the LLM directly with the messages
-                        print(f"[DEBUG IMAGE] Sending {len(messages)} messages to LLM")
-                        response = await self.llm.ainvoke(messages)
-                        print(f"[DEBUG IMAGE] Got response from LLM: {response}")
-                        
-                        # Format the response like the agent executor would
-                        return {"output": response.content}
-                    except Exception as e:
-                        print(f"[ERROR] Error invoking LLM directly: {e}")
-                        import traceback
-                        traceback.print_exc()
-                        return {"output": f"I had trouble processing the image. Error: {str(e)}"}
-                else:
-                    # Standard text-only execution with exact key matching the example
-                    # Use only human_input as requested - no latitude/longitude
-                    agent_input = {
-                        "human_input": enhanced_input
+                # Always use the agent executor regardless of whether we have an image
+                # The verify_refund_image tool will access the image data when needed
+                
+                # Track if this is an image analysis request in agent input
+                agent_input = {
+                    "human_input": enhanced_input
+                }
+                
+                if image_data:
+                    # Add a flag in the input to indicate image presence
+                    # This helps the agent know an image was uploaded
+                    agent_input["has_image"] = True
+                    print(f"[DEBUG IMAGE] Processing request with image through agent executor")
+                
+                # Execute the agent with the prepared input
+                return await self.agent_executor.ainvoke(
+                    agent_input,
+                    config={
+                        "callbacks": [streaming_handler]
                     }
-                    
-                    # No need to manually add the user message anymore
-                    # AgentExecutor handles this through the memory system
-                    
-                    # Execute the agent with the prepared input - using our memory-free executor
-                    return await self.agent_executor.ainvoke(
-                        agent_input,
-                        config={
-                            "callbacks": [streaming_handler]
-                        }
-                    )
+                )
             except Exception as e:
                 print(f"[ERROR] Agent execution error: {str(e)}")
                 import traceback

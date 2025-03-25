@@ -1,144 +1,259 @@
-/* Markdown styling for chat messages */
+/* Enhanced Markdown styling for chat messages */
 
 .markdown-content {
-  line-height: 1.5;
+  line-height: 1.6;
+  font-size: 1rem;
 }
 
-/* Headings */
+/* Headings with gradient text */
 .markdown-content h1 {
   font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0.75rem 0;
-  color: #2d3748;
+  font-weight: 700;
+  margin: 1rem 0 0.75rem;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, #f97316, #fb923c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .markdown-content h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin: 0.75rem 0;
-  color: #2d3748;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0.9rem 0 0.7rem;
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, #f97316, #fb923c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .markdown-content h3 {
-  font-size: 1.125rem;
+  font-size: 1.2rem;
   font-weight: 600;
-  margin: 0.5rem 0;
-  color: #2d3748;
+  margin: 0.8rem 0 0.6rem;
+  color: #f97316;
 }
 
 .markdown-content h4, 
 .markdown-content h5, 
 .markdown-content h6 {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  margin: 0.5rem 0;
-  color: #2d3748;
+  margin: 0.7rem 0 0.5rem;
+  color: #f97316;
 }
 
-/* Paragraph */
+/* Paragraph with improved spacing */
 .markdown-content p {
-  margin: 0.5rem 0;
+  margin: 0.7rem 0;
+  color: rgba(0, 0, 0, 0.8);
 }
 
-/* Lists */
+/* Lists with enhanced bullets */
 .markdown-content ul {
-  list-style-type: disc;
-  margin-left: 1rem;
-  margin-top: 0.5rem;
+  list-style-type: none;
+  margin-left: 0.5rem;
+  margin-top: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.markdown-content ul li {
+  position: relative;
+  padding-left: 1.5rem;
   margin-bottom: 0.5rem;
+}
+
+.markdown-content ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  width: 0.4rem;
+  height: 0.4rem;
+  background-color: #f97316;
+  border-radius: 50%;
 }
 
 .markdown-content ol {
-  list-style-type: decimal;
-  margin-left: 1rem;
-  margin-top: 0.5rem;
+  list-style-type: none;
+  counter-reset: item;
+  margin-left: 0.5rem;
+  margin-top: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.markdown-content ol li {
+  position: relative;
+  padding-left: 1.5rem;
   margin-bottom: 0.5rem;
+  counter-increment: item;
 }
 
-.markdown-content li {
-  margin-bottom: 0.25rem;
+.markdown-content ol li::before {
+  content: counter(item) ".";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #f97316;
+  font-weight: 600;
 }
 
-/* Links */
+/* Better looking links */
 .markdown-content a {
-  color: #4a5568;
-  text-decoration: underline;
+  color: #f97316;
+  text-decoration: none;
+  border-bottom: 1px dotted #f97316;
+  transition: color 0.2s ease, border-color 0.2s ease;
 }
 
 .markdown-content a:hover {
-  color: #2c5282;
+  color: #fb923c;
+  border-bottom: 1px solid #fb923c;
 }
 
-/* Emphasis */
+/* Text emphasis */
 .markdown-content strong,
 .markdown-content b {
   font-weight: 700;
-  color: #1a365d;
+  color: #f97316;
 }
 
 .markdown-content em,
 .markdown-content i {
   font-style: italic;
+  color: rgba(0, 0, 0, 0.75);
 }
 
-/* Code */
+/* Modern code styling */
 .markdown-content code {
-  font-family: monospace;
-  background-color: #edf2f7;
-  padding: 0.125rem 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background-color: rgba(249, 115, 22, 0.07);
+  padding: 0.15rem 0.3rem;
   border-radius: 0.25rem;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.1);
 }
 
 .markdown-content pre {
-  background-color: #edf2f7;
-  padding: 0.5rem;
-  border-radius: 0.375rem;
+  background-color: rgba(249, 115, 22, 0.03);
+  backdrop-filter: blur(5px);
+  padding: 0.75rem;
+  border-radius: 0.5rem;
   overflow-x: auto;
-  margin: 0.5rem 0;
+  margin: 0.7rem 0;
+  border: 1px solid rgba(249, 115, 22, 0.1);
 }
 
 .markdown-content pre code {
   background-color: transparent;
   padding: 0;
+  border: none;
+  color: #f97316;
 }
 
-/* Blockquotes */
+/* Elegant blockquotes */
 .markdown-content blockquote {
-  border-left: 4px solid #e2e8f0;
-  padding-left: 0.75rem;
-  margin-left: 0;
-  margin-right: 0;
+  border-left: 3px solid #f97316;
+  padding: 0.5rem 0 0.5rem 1rem;
+  margin: 1rem 0;
+  background-color: rgba(249, 115, 22, 0.05);
+  border-radius: 0 0.35rem 0.35rem 0;
+}
+
+.markdown-content blockquote p {
+  color: rgba(0, 0, 0, 0.7);
   font-style: italic;
-  color: #4a5568;
 }
 
 /* Horizontal Rules */
 .markdown-content hr {
-  border-color: #e2e8f0;
-  margin: 1rem 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.6), transparent);
+  margin: 1.5rem 0;
 }
 
-/* Tables */
+/* Enhanced Tables */
 .markdown-content table {
   width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0;
-  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .markdown-content table th,
 .markdown-content table td {
-  border: 1px solid #e2e8f0;
-  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(249, 115, 22, 0.1);
+  padding: 0.5rem 0.75rem;
   text-align: left;
 }
 
 .markdown-content table th {
-  background-color: #f7fafc;
+  background-color: rgba(249, 115, 22, 0.1);
   font-weight: 600;
+  color: #f97316;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
 }
 
 .markdown-content table tr:nth-child(even) {
-  background-color: #f7fafc;
+  background-color: rgba(249, 115, 22, 0.03);
+}
+
+/* Additional features */
+
+/* Checkboxes */
+.markdown-content input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.markdown-content input[type="checkbox"]:checked {
+  background-color: #f97316;
+  border-color: #f97316;
+}
+
+.markdown-content input[type="checkbox"]:checked::before {
+  content: '✓';
+  display: block;
+  color: white;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1.1rem;
+}
+
+/* Images */
+.markdown-content img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+/* Better keyboard key presentation */
+.markdown-content kbd {
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.3rem;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2), 0 2px 0 0 rgba(255, 255, 255, 0.7) inset;
+  color: #334155;
+  display: inline-block;
+  font-size: 0.85em;
+  font-family: monospace;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
 }

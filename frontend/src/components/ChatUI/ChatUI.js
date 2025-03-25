@@ -17,6 +17,8 @@ import EnhancedMessage from './elements/EnhancedMessage'; // Import our new comp
 // Import styles
 import './styles/chatPatterns.css';
 import './styles/markdown.css';
+import './styles/cardAnimations.css';
+import './styles/enhancedEffects.css';
 
 // Import custom hooks
 import useChatStream from './hooks/useChatStream';
@@ -283,22 +285,74 @@ const ChatUI = () => {
             <motion.div 
               className={`fixed ${
                 isFullScreen 
-                  ? "inset-0 rounded-none bg-white/60 backdrop-blur-lg border-0" 
-                  : "top-0 right-0 h-full bg-white/60 backdrop-blur-lg rounded-l-2xl border-l border-white/30 w-[35%] min-w-[350px]"
+                  ? "inset-0 rounded-none glass-panel-enhanced border-0" 
+                  : "top-0 right-0 h-full glass-panel-enhanced rounded-l-2xl border-l border-white/30 w-[40%] min-w-[350px]"
               } shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-5 z-40 flex flex-col overflow-hidden chat-bg-pattern`}
               initial={{ opacity: 0, x: 100, scale: 0.95 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 100, scale: 0.95 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              transition={{ duration: 0.3, type: "spring", stiffness: 100, damping: 20 }}
             >
+              {/* Particle effects */}
+              <div className="particle-container">
+                <motion.div 
+                  className="particle particle-1"
+                  animate={{
+                    opacity: [0, 0.7, 0],
+                    y: [-20, -60],
+                    x: [0, 30]
+                  }}
+                  transition={{ 
+                    duration: 8,
+                    repeat: Infinity,
+                    repeatType: "loop"
+                  }}
+                />
+                <motion.div 
+                  className="particle particle-2"
+                  animate={{
+                    opacity: [0, 0.5, 0],
+                    y: [-10, -70],
+                    x: [0, -20]
+                  }}
+                  transition={{ 
+                    duration: 10,
+                    repeat: Infinity,
+                    repeatType: "loop",
+                    delay: 2
+                  }}
+                />
+                <motion.div 
+                  className="particle particle-3"
+                  animate={{
+                    opacity: [0, 0.6, 0],
+                    y: [-5, -50],
+                    x: [0, 10]
+                  }}
+                  transition={{ 
+                    duration: 12,
+                    repeat: Infinity,
+                    repeatType: "loop",
+                    delay: 4
+                  }}
+                />
+              </div>
               <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
                 <div className="flex items-center">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 flex items-center justify-center text-white mr-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">Food Assistant</h2>
+                  <motion.div className="w-8 h-8 flex items-center justify-center mr-2">
+                    <motion.img 
+                      src="https://img.icons8.com/?size=512&id=M8M9YjBrtUkd&format=png"
+                      className="w-8 h-8"
+                      alt="Swiggy AI"
+                      animate={{ y: [0, -5, 0] }}
+                      transition={{ 
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  </motion.div>
+                  <h2 className="text-lg font-bold bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">Swiggy AI</h2>
                 </div>
                 <div className="flex gap-2">
                   {/* History button */}
@@ -412,11 +466,26 @@ const ChatUI = () => {
                         )}
                         
                         <div className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
+                          {!message.isUser && (
+                            <div className="mr-2 self-end">
+                              <motion.img
+                                src="https://img.icons8.com/?size=512&id=M8M9YjBrtUkd&format=png"
+                                alt="AI Assistant"
+                                className="w-7 h-7"
+                                animate={{ y: [0, -5, 0] }}
+                                transition={{ 
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "easeInOut"
+                                }}
+                              />
+                            </div>
+                          )}
                           <div
                             className={`px-4 py-3 rounded-lg max-w-[85%] ${
                               message.isUser
-                                ? "message-bubble-user text-white rounded-br-none"
-                                : "message-bubble-assistant border-gray-100 text-gray-800 rounded-bl-none"
+                                ? "message-bubble-user-enhanced text-white rounded-br-none"
+                                : "message-bubble-assistant-enhanced text-gray-800 rounded-bl-none"
                             } ${message.error ? "bg-red-50 border border-red-100 text-red-600" : ""}`}
                           >
                             {message.image && (
@@ -454,15 +523,21 @@ const ChatUI = () => {
                           </div>
                         </div>
                         
-                        {/* Structured data renders below message - Kept for backward compatibility */}
+                        {/* Structured data renders between message segments - For backward compatibility */}
                         {!message.isUser && message.structuredData && message.structuredData.length > 0 && (
-                          <div className="mt-2">
+                          <div className="cards-container w-full my-3 animate-cards-entrance">
                             {message.structuredData.map((item, idx) => (
                               <motion.div 
                                 key={idx}
-                                initial={{ opacity: 0, y: 10 }}
+                                className="card-wrapper mb-3"
+                                initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.1 * idx, duration: 0.3 }}
+                                transition={{ duration: 0.4, delay: 0.1 * idx }}
+                                whileHover={{ 
+                                  y: -4,
+                                  boxShadow: "0 12px 25px rgba(0, 0, 0, 0.07)",
+                                  transition: { duration: 0.2 }
+                                }}
                               >
                                 {renderStructuredData(item.type, item.data)}
                               </motion.div>
@@ -531,47 +606,54 @@ const ChatUI = () => {
                 <div ref={messagesEndRef} />
               </div>
               
-              <div className="mt-2 flex items-center">
-                <button 
-                  className="text-gray-500 hover:text-gray-700 p-1" 
-                  onClick={() => document.getElementById('image-upload').click()}
-                  title="Upload image"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <input 
-                    id="image-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleImageUpload} 
-                    className="hidden" 
+              <div className="mt-4 relative">
+                <div className="glass-panel-enhanced rounded-full flex items-center pr-1 focus-within:ring-2 focus-within:ring-orange-400 focus-within:shadow-lg transition-all duration-300">
+                  <motion.button 
+                    className="text-gray-500 hover:text-orange-500 p-2.5" 
+                    onClick={() => document.getElementById('image-upload').click()}
+                    title="Upload image"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <input 
+                      id="image-upload" 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload} 
+                      className="hidden" 
+                    />
+                  </motion.button>
+                  <input
+                    type="text"
+                    placeholder="Type your message..."
+                    className="flex-1 bg-transparent py-3 px-3 focus:outline-none text-gray-700"
+                    value={inputValue}
+                    onChange={handleInputChange}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isLoading) {
+                        handleSendMessage();
+                      }
+                    }}
+                    disabled={isLoading}
                   />
-                </button>
-                <input
-                  type="text"
-                  placeholder="Type your message..."
-                  className="flex-1 border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  value={inputValue}
-                  onChange={handleInputChange}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isLoading) {
-                      handleSendMessage();
-                    }
-                  }}
-                  disabled={isLoading}
-                />
-                <motion.button
-                  className={`ml-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full p-2 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  onClick={() => handleSendMessage()}
-                  disabled={isLoading}
-                  whileHover={{ scale: 1.05, boxShadow: "0 4px 6px -1px rgba(252, 128, 25, 0.5)" }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </motion.button>
+                  <motion.button
+                    className={`ml-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full p-2.5 shadow-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => handleSendMessage()}
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.05, boxShadow: "0 4px 10px -1px rgba(252, 128, 25, 0.5)" }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  </motion.button>
+                </div>
+                
+                {/* Subtle glow effect under input */}
+                <div className="absolute -bottom-2 left-1/2 w-1/2 h-1 bg-orange-500/20 blur-md rounded-full transform -translate-x-1/2"></div>
               </div>
               
               {/* Optional styling for loading animation */}

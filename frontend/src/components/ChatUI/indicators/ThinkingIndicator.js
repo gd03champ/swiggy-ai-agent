@@ -18,14 +18,14 @@ const ThinkingIndicator = ({ thinking }) => {
   
   return (
     <motion.div 
-      className="p-4 bg-white rounded-xl mb-3 text-sm border border-gray-100 shadow-sm"
+      className="p-4 rounded-xl mb-3 text-sm thinking-box-enhanced"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.3, type: "spring", stiffness: 120 }}
     >
-      <div className="font-bold text-indigo-600 mb-2 flex items-center">
-        <span className="inline-flex mr-2 bg-gradient-to-r from-indigo-600 to-blue-500 p-1 rounded-full">
+      <div className="mb-2 flex items-center">
+        <span className="inline-flex mr-2 bg-gradient-to-r from-orange-500 to-orange-600 p-1 rounded-full pulse-glow">
           <motion.div
             animate={{ rotate: [0, 360] }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
@@ -36,7 +36,37 @@ const ThinkingIndicator = ({ thinking }) => {
             </svg>
           </motion.div>
         </span>
-        <span className="bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">Thinking...</span>
+        <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent font-bold enhanced-heading">
+          Thinking...
+        </span>
+        
+        {/* Particle effects */}
+        <div className="relative ml-2">
+          <motion.span 
+            className="inline-block w-1 h-1 rounded-full bg-orange-400"
+            animate={{ 
+              opacity: [0.2, 1, 0.2], 
+              scale: [0.8, 1.2, 0.8] 
+            }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.span 
+            className="inline-block w-1 h-1 rounded-full bg-orange-400 ml-1"
+            animate={{ 
+              opacity: [0.2, 1, 0.2], 
+              scale: [0.8, 1.2, 0.8] 
+            }}
+            transition={{ duration: 1.5, delay: 0.5, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.span 
+            className="inline-block w-1 h-1 rounded-full bg-orange-400 ml-1"
+            animate={{ 
+              opacity: [0.2, 1, 0.2], 
+              scale: [0.8, 1.2, 0.8] 
+            }}
+            transition={{ duration: 1.5, delay: 1, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
       </div>
       <div className="text-gray-700 whitespace-pre-wrap">
         {thinkingLines.map((line, i) => (

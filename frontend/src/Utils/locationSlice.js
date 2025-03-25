@@ -5,12 +5,12 @@ const locationSlice = createSlice({
   initialState: {
     locationDetails: [
       {
-        pincode: 400001,
-        area: "Bazargate",
-        lat: 18.9486,
-        lng: 72.83662,
-        district: "Mumbai",
-        state: "Maharashtra",
+        pincode: 560103,
+        area: "Embassy Tech Village",
+        lat: 12.92888450548889,
+        lng: 77.69245843455866,
+        district: "Bengaluru",
+        state: "Karnataka",
       },
     ],
   },

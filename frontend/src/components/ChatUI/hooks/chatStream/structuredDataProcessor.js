@@ -44,7 +44,29 @@ export const detectStructuredData = (data) => {
       return data;
     }
     
-    // Case 2: Restaurant data detection
+    // Case 2: Image verification result detection
+    if (data.verification_score !== undefined || 
+        (data.verification_status !== undefined) || 
+        (data.recommendation !== undefined && data.flagged_issues !== undefined)) {
+      console.log("[DEBUG CRITICAL] Detected image verification result");
+      return {
+        type: 'image_verification_result',
+        data: data
+      };
+    }
+    
+    // Case 3: Refund workflow state detection
+    if ((data.workflow_id || data.current_state) && 
+        (data.current_stage !== undefined || (data.stage !== undefined && 
+        (data.order_id !== undefined || data.reason_category)))) {
+      console.log("[DEBUG CRITICAL] Detected refund workflow state");
+      return {
+        type: 'refund_workflow_state',
+        data: data
+      };
+    }
+    
+    // Case 3: Restaurant data detection
     if (data.name && (data.cuisine || data.rating)) {
       return {
         type: 'restaurant',
@@ -52,7 +74,7 @@ export const detectStructuredData = (data) => {
       };
     }
     
-    // Case 3: Food item data detection
+    // Case 4: Food item data detection
     if (data.name && (data.price || data.description)) {
       return {
         type: 'food_item',

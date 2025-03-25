@@ -12,6 +12,7 @@ from pymongo import MongoClient
 client = MongoClient("mongodb://localhost:27017/")
 db = client["restaurant_db"]
 collection = db["placed_orders"]
+refunds_collection = db["refunds"]  # Collection for storing refund data
 
 @tool
 def get_order_details(order_id: str) -> Dict[str, Any]:
@@ -114,6 +115,21 @@ def initiate_refund(order_id: str, reason: str, validation_details: str = "") ->
                 processing_time = 2  # 2 days for processing
                 break
         
+        # Check if refund already exists for this order
+        existing_refund = refunds_collection.find_one({"order_id": order_id_str})
+        if existing_refund:
+            # Convert MongoDB ObjectId to string for JSON serialization
+            existing_refund["_id"] = str(existing_refund["_id"])
+            
+            return {
+                "type": "refund_status",
+                "data": existing_refund,
+                "message": "A refund request already exists for this order"
+            }
+        
+        # Generate unique refund ID
+        refund_id = f"RF{int(datetime.now().timestamp())}"
+            
         # Create a detailed refund object
         refund_data = {
             "order_id": order_id_str,
@@ -122,11 +138,23 @@ def initiate_refund(order_id: str, reason: str, validation_details: str = "") ->
             "reason": detailed_reason,
             "timestamp": datetime.now().isoformat(),
             "estimated_days": processing_time,
-            "refund_id": f"RF{int(datetime.now().timestamp())}"  # Generate a unique refund ID
+            "refund_id": refund_id
         }
         
-        # In a real app, would store in the database
-        # refunds_collection.insert_one(refund_data)
+        # Store the refund request in MongoDB
+        refunds_collection.insert_one(refund_data)
+        
+        # Update the original order with refund status
+        collection.update_one(
+            {"_id": ObjectId(order_id)},
+            {"$set": {
+                "refund_status": status,
+                "refund_id": refund_id,
+                "refund_timestamp": datetime.now().isoformat()
+            }}
+        )
+        
+        print(f"Refund {refund_id} created for order {order_id_str} with status: {status}")
         
         # Return formatted for frontend rendering
         return {
@@ -136,38 +164,51 @@ def initiate_refund(order_id: str, reason: str, validation_details: str = "") ->
     except Exception as e:
         return {"error": "Error processing refund", "message": str(e)}
 
-def check_order_status(order_id: str) -> Dict[str, Any]:
+@tool
+def get_refund_details(order_id: str) -> Dict[str, Any]:
     """
-    Check the status of an order. For the POC, this returns mock data.
+    Retrieve refund details for a specific order by its ID.
     
     Args:
-        order_id: The ID of the order to check
+        order_id: The ID of the order to check refund status for
         
     Returns:
-        Dictionary with order status or error message
+        Dictionary with refund details or error message
     """
     try:
-        # Verify the order exists
-        order = collection.find_one({"_id": ObjectId(order_id)})
-        
+        # Try to convert to ObjectId if it's not already
+        try:
+            obj_id = ObjectId(order_id)
+        except:
+            return {"error": "Invalid order ID", "message": f"The order ID '{order_id}' is not valid"}
+            
+        # First check if the order exists
+        order = collection.find_one({"_id": obj_id})
         if not order:
             return {"error": "Order not found", "message": f"No order found with ID: {order_id}"}
             
-        # For demo purposes, return mock delivery status
-        # In a real app, would fetch from a delivery tracking system
-        statuses = ["Order Placed", "Order Confirmed", "Preparing", "Out for Delivery", "Delivered"]
+        order_id_str = str(order["_id"])
+            
+        # Look for refund associated with this order
+        refund = refunds_collection.find_one({"order_id": order_id_str})
         
-        # Use order _id hash to determine mock status (for demo consistency)
-        status_idx = hash(str(order["_id"])) % len(statuses)
-        
-        return {
-            "type": "order_status",
-            "data": {
-                "order_id": str(order["_id"]),
-                "status": statuses[status_idx],
-                "estimated_delivery": "30-45 minutes" if status_idx < 4 else "Delivered",
-                "timestamp": datetime.now().isoformat()
+        if not refund:
+            return {
+                "type": "refund_status",
+                "data": {
+                    "order_id": order_id_str,
+                    "status": "No Refund",
+                    "message": "No refund has been requested for this order"
+                }
             }
+        
+        # Convert ObjectId to string for JSON serialization
+        refund["_id"] = str(refund["_id"])
+        
+        # Return formatted for frontend rendering
+        return {
+            "type": "refund_status",
+            "data": refund
         }
     except Exception as e:
-        return {"error": "Error checking order status", "message": str(e)}
+        return {"error": "Error retrieving refund details", "message": str(e)}

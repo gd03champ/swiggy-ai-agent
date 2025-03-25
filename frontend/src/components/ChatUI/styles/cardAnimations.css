@@ -1,0 +1,122 @@
+/* Card Animation Styles */
+
+/* Card entrance animation from bottom with fade */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-cards-entrance {
+  animation: cards-container-entrance 0.4s ease-out forwards;
+}
+
+@keyframes cards-container-entrance {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modern styling for card containers */
+.cards-container {
+  margin-left: 0;
+  margin-right: 0;
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Make cards take full width and stand out */
+.card-wrapper {
+  width: 100%;
+  position: relative;
+}
+
+/* Special animation for add-to-cart success */
+@keyframes addToCartPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.add-to-cart-animation {
+  animation: addToCartPulse 0.3s ease-in-out;
+}
+
+/* Message segments layout */
+.message-segments-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+/* Make sequential chat bubbles appear connected */
+.message-segments-wrapper .chat-message {
+  margin-bottom: 0;
+}
+
+.message-segments-wrapper .chat-message:not(:first-child) {
+  border-top-right-radius: 16px;
+  margin-top: 2px;
+}
+
+.message-segments-wrapper .chat-message:not(:last-child) {
+  border-bottom-right-radius: 16px;
+  margin-bottom: 2px;
+}
+
+/* Add vertical spacing between each segment (text or card) */
+.message-segments-wrapper > div + div {
+  margin-top: 8px;
+}
+
+/* Better visual separation for cards between text */
+.message-segments-wrapper .cards-container {
+  position: relative;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  z-index: 5;
+}
+
+/* Animation for sequential message segments */
+@keyframes sequentialFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-segments-wrapper > div {
+  animation: sequentialFadeIn 0.3s ease-out forwards;
+}
+
+/* Subtle hover effects for interactive elements */
+.card-interactive-element {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-interactive-element:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}

@@ -21,11 +21,11 @@ export const prepareRequestBody = (
   mediaData = null,
   recentMessages = []
 ) => {
-  // Format the last 6 messages into a special tag format
+  // Format the last 3 messages into a special tag format (reduced from 6 to prevent token limit issues)
   let historyText = "";
   if (recentMessages.length > 0) {
     historyText = "\n\n<chat_history>\n";
-    recentMessages.slice(-6).forEach(msg => {
+    recentMessages.slice(-3).forEach(msg => {
       const role = msg.isUser ? "User" : "Assistant";
       historyText += `${role}: ${msg.text}\n`;
     });
